@@ -29,7 +29,7 @@ public class ConexionBaseDatos {
   - Si la conexión es exitosa, retornará un objeto `Connection`.
   - Si ocurre algún problema (por ejemplo, si la base de datos no está accesible, el usuario o contraseña son incorrectos, etc.), lanzará una excepción `SQLException`.
 
-<h1 align="center">Funcionamiento de ConexionFilter</h1>
+<h1 align="center">Clase ConexionFilter</h1>
 
 ```java
 package org.CCristian.apiservlet.webapp.headers.filters;
@@ -86,3 +86,19 @@ public class ConexionFilter implements Filter {
   - `catch (SQLException e) { conn.rollback(); ... }`: Si ocurre una excepción `SQLException` durante el procesamiento de la solicitud, se deshacen (rollback) todas las operaciones de la transacción. También se envía un error HTTP 500 (Internal Server Error) al cliente con el mensaje de la excepción y se imprime la pila de llamadas.
 - Manejo de Excepciones al Conectar:
   - `catch (SQLException e) { throw new RuntimeException(e); }`: Si ocurre una excepción `SQLException` al obtener la conexión a la base de datos, se envuelve en una `RuntimeException` y se lanza. Esto detiene el procesamiento de la solicitud y propaga el error hacia arriba.
+
+<h2>Flujo de Trabajo Completo</h2>
+
+- Interceptación de la Solicitud:
+    - Cada solicitud entrante es interceptada por el `ConexionFilter`.
+- Conexión a la Base de Datos:
+  - Se obtiene una conexión a la base de datos.
+  - Se desactiva el `auto-commit` para manejar manualmente las transacciones.
+- Procesamiento de la Solicitud:
+  - La conexión se agrega como un atributo de la solicitud.
+  - La solicitud se pasa al siguiente filtro o servlet.
+- Confirmación o Reversión de la Transacción:
+  - Si el procesamiento de la solicitud es exitoso, se confirma la transacción.
+  - Si ocurre una excepción, se deshacen las operaciones y se envía un error al cliente.
+
+<p>Este filtro asegura que cada solicitud tenga su propia conexión a la base de datos y que las transacciones sean manejadas adecuadamente, asegurando la integridad de los datos en caso de errores.</p>
