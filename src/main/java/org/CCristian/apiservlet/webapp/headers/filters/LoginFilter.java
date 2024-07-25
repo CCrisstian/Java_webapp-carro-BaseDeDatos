@@ -11,7 +11,7 @@ import java.io.IOException;
 import java.util.Optional;
 
 @WebFilter({"/carro/*"})
-public class LoginFiltro implements Filter {    /*Filtro para validar la Sesion de Usuario*/
+public class LoginFilter implements Filter {    /*Filtro para validar la Sesion de Usuario*/
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         LoginService service = new LoginServiceSessionImpl();
