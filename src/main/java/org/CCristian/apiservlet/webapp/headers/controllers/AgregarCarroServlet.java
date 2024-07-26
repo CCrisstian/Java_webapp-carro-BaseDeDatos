@@ -11,8 +11,10 @@ import org.CCristian.apiservlet.webapp.headers.models.Carro;
 import org.CCristian.apiservlet.webapp.headers.models.ItemCarro;
 import org.CCristian.apiservlet.webapp.headers.models.Producto;
 import org.CCristian.apiservlet.webapp.headers.services.ProductoServiceImpl;
+import org.CCristian.apiservlet.webapp.headers.services.ProductosServiceJdbcImpl;
 
 import java.io.IOException;
+import java.sql.Connection;
 import java.util.Optional;
 
 @WebServlet("/carro/agregar")
@@ -21,7 +23,8 @@ public class AgregarCarroServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         Long id = Long.parseLong(req.getParameter("id"));
-        ProductoService service = new ProductoServiceImpl();
+        Connection conn = (Connection) req.getAttribute("conn"); /*Obtiene la conexión a la Base de Datos*/
+        ProductoService service = new ProductosServiceJdbcImpl(conn);
         Optional<Producto> producto = service.porId(id);
         if (producto.isPresent()) {
             ItemCarro item = new ItemCarro(1, producto.get());
