@@ -209,7 +209,7 @@ Esta clase implementa la interfaz `ProductoService` y proporciona lógica de neg
   - `listar()`: Este método llama al método `listar` del repositorio y devuelve una lista de productos. Si ocurre una excepción, se lanza una `ServiceJdbcException`.
   - `porId(Long id)`: Este método llama al método `porId` del repositorio y devuelve un producto por su ID. Si ocurre una excepción, se lanza una `ServiceJdbcException`.
 
- <h1 align="center"></h1>
+ <h1 align="center">ProductoServlet</h1>
 
 ```java
  package org.CCristian.apiservlet.webapp.headers.controllers;
