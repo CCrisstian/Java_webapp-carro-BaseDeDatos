@@ -15,19 +15,14 @@ public class ConexionBaseDatos {
 }
 ```
 
-<h2>Método getConection():</h2>
+Esta clase se encarga de gestionar la conexión a la base de datos.
 
-- Este método es `public` y `static`, lo que significa que puede ser llamado sin necesidad de instanciar un objeto de la clase `ConexionBaseDatos`.
-- Devuelve un objeto de tipo `Connection`, que es una conexión abierta a la base de datos.
-- Utiliza el método `DriverManager.getConnection(url, username, password)` para crear y retornar una conexión a la base de datos MySQL usando los parámetros definidos anteriormente.
-- Si ocurre un error al intentar conectarse, este método lanzará una excepción `SQLException`.
-
-<h2>Flujo de Trabajo</h2>
-
-- Cuando llames a `ConexionBaseDatos.getConection()`, el método:
-  - Utilizará los parámetros `url`, `username` y `password` para intentar establecer una conexión con la base de datos MySQL.
-  - Si la conexión es exitosa, retornará un objeto `Connection`.
-  - Si ocurre algún problema (por ejemplo, si la base de datos no está accesible, el usuario o contraseña son incorrectos, etc.), lanzará una excepción `SQLException`.
+- Atributos:
+  - `url`: URL de la base de datos.
+  - `username`: Nombre de usuario de la base de datos.
+  - `password`: Contraseña de la base de datos.
+- Método:
+  - `getConection()`: Este método establece y devuelve una conexión a la base de datos utilizando `DriverManager.getConnection` con los parámetros de URL, nombre de usuario y contraseña.
 
 <h1 align="center">Clase ConexionFilter</h1>
 
@@ -37,6 +32,7 @@ package org.CCristian.apiservlet.webapp.headers.filters;
 import jakarta.servlet.*;
 import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.HttpServletResponse;
+import org.CCristian.apiservlet.webapp.headers.services.ServiceJdbcException;
 import org.CCristian.apiservlet.webapp.headers.util.ConexionBaseDatos;
 
 import java.io.IOException;
@@ -45,6 +41,16 @@ import java.sql.SQLException;
 
 @WebFilter("/*")
 public class ConexionFilter implements Filter {
+
+    @Override
+    public void init(FilterConfig filterConfig) throws ServletException {
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+        } catch (ClassNotFoundException e) {
+            throw new ServletException("No se pudo cargar el controlador JDBC", e);
+        }
+    }
+
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
 
@@ -56,7 +62,7 @@ public class ConexionFilter implements Filter {
                 request.setAttribute("conn", conn);
                 chain.doFilter(request, response);
                 conn.commit();
-            } catch (SQLException e){
+            } catch (SQLException | ServiceJdbcException e){
                 conn.rollback();
                 ((HttpServletResponse)response).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
                 e.printStackTrace();
@@ -68,37 +74,191 @@ public class ConexionFilter implements Filter {
 }
 ```
 
-<h2>Explicación</h2>
+Esta clase es un filtro servlet que gestiona las conexiones a la base de datos para cada solicitud.
 
-- Anotación `@WebFilter`:
-  - `@WebFilter("/*")` indica que este filtro se aplicará a todas las solicitudes (`/*`) que lleguen al servidor.
-- Método `doFilter`:
-  - Este es el método principal del filtro, que intercepta las solicitudes y respuestas.
-- Establecimiento de la Conexión:
-  - `try (Connection conn = ConexionBaseDatos.getConection())`: Intenta obtener una conexión a la base de datos usando el método `getConection()` de la clase `ConexionBaseDatos`. El bloque `try-with-resources` asegura que la conexión se cerrará automáticamente al final del bloque, incluso si ocurre una excepción.
-- Configuración de `AutoCommit`:
-  - `if (conn.getAutoCommit()) { conn.setAutoCommit(false); }`: Verifica si la conexión tiene `auto-commit` activado y lo desactiva si es necesario. Esto significa que las transacciones no se confirmarán automáticamente después de cada operación SQL, sino que se controlarán manualmente.
-- Paso de la Conexión a la Solicitud:
-  - `request.setAttribute("conn", conn);`: La conexión se añade como un atributo a la solicitud para que esté disponible durante el procesamiento de la solicitud.
-  - `chain.doFilter(request, response);`: Se pasa la solicitud y la respuesta al siguiente filtro o servlet en la cadena de filtros.
-- Confirmación y Control de Transacciones:
-  - `conn.commit();`: Si no hay excepciones, la transacción se confirma (commit) después de que se complete el procesamiento de la solicitud.
-  - `catch (SQLException e) { conn.rollback(); ... }`: Si ocurre una excepción `SQLException` durante el procesamiento de la solicitud, se deshacen (rollback) todas las operaciones de la transacción. También se envía un error HTTP 500 (Internal Server Error) al cliente con el mensaje de la excepción y se imprime la pila de llamadas.
-- Manejo de Excepciones al Conectar:
-  - `catch (SQLException e) { throw new RuntimeException(e); }`: Si ocurre una excepción `SQLException` al obtener la conexión a la base de datos, se envuelve en una `RuntimeException` y se lanza. Esto detiene el procesamiento de la solicitud y propaga el error hacia arriba.
+- Métodos:
+  - `init(FilterConfig filterConfig)`: Este método se ejecuta al inicializar el filtro y carga el controlador JDBC.
+  - `doFilter(ServletRequest request, ServletResponse response, FilterChain chain)`: Este método se ejecuta para cada solicitud entrante. Establece una conexión a la base de datos, desactiva el auto-commit, y añade la conexión como un atributo de la solicitud. Luego, permite que la solicitud continúe a través del filtro. Si ocurre alguna excepción, se realiza un rollback de la transacción y se envía un error HTTP 500.
 
-<h2>Flujo de Trabajo Completo</h2>
+<h1 align="center">ProductoRepositoryJdbcImpl</h1>
 
-- Interceptación de la Solicitud:
-    - Cada solicitud entrante es interceptada por el `ConexionFilter`.
-- Conexión a la Base de Datos:
-  - Se obtiene una conexión a la base de datos.
-  - Se desactiva el `auto-commit` para manejar manualmente las transacciones.
-- Procesamiento de la Solicitud:
-  - La conexión se agrega como un atributo de la solicitud.
-  - La solicitud se pasa al siguiente filtro o servlet.
-- Confirmación o Reversión de la Transacción:
-  - Si el procesamiento de la solicitud es exitoso, se confirma la transacción.
-  - Si ocurre una excepción, se deshacen las operaciones y se envía un error al cliente.
+```java
+package org.CCristian.apiservlet.webapp.headers.repositories;
 
-<p>Este filtro asegura que cada solicitud tenga su propia conexión a la base de datos y que las transacciones sean manejadas adecuadamente, asegurando la integridad de los datos en caso de errores.</p>
+import org.CCristian.apiservlet.webapp.headers.models.Producto;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ProductoRepositoryJdbcImpl implements Repository<Producto>{
+
+    private Connection conn;
+
+    public ProductoRepositoryJdbcImpl(Connection conn) {
+        this.conn = conn;
+    }
+
+    @Override
+    public List<Producto> listar() throws SQLException {
+        List<Producto> productos = new ArrayList<>();
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT p.*, c.nombre as categoria FROM productos AS p " +
+                                     " INNER JOIN categorias AS c ON (p.categoria_id = c.id)" +
+                                  " ORDER BY p.id")){
+            while (rs.next()){
+                Producto p = getProducto(rs);
+                productos.add(p);
+            }
+        }
+        return productos;
+    }
+
+
+    @Override
+    public Producto porId(Long id) throws SQLException {
+        Producto producto = null;
+        try (PreparedStatement stmt = conn.prepareStatement("SELECT p.*, c.nombre AS categoria FROM productos AS p "+
+                " INNER JOIN categorias AS c ON (p.categoria_id = c.id) WHERE p.id = ?")){
+            stmt.setLong(1, id);
+            try (ResultSet rs = stmt.executeQuery()){
+                if (rs.next()){
+                    producto = getProducto(rs);
+                }
+            }
+        }
+        return producto;
+    }
+
+    @Override
+    public void guardar(Producto producto) throws SQLException {
+
+    }
+
+    @Override
+    public void eliminar(Long id) throws SQLException {
+
+    }
+
+    private static Producto getProducto(ResultSet rs) throws SQLException {
+        Producto p = new Producto();
+        p.setId(rs.getLong("id"));
+        p.setNombre(rs.getString("nombre"));
+        p.setPrecio(rs.getInt("precio"));
+        p.setTipo(rs.getString("categoria"));
+        return p;
+    }
+}
+```
+
+Esta clase implementa la interfaz `Repository<Producto>` y proporciona métodos para interactuar con la base de datos.
+
+- Atributo:
+  - `conn`: La conexión a la base de datos.
+- Métodos:
+  - `listar()`: Este método devuelve una lista de todos los productos en la base de datos. Ejecuta una consulta SQL que une las tablas de productos y categorías y devuelve los resultados como objetos `Producto`.
+  - `porId(Long id)`: Este método devuelve un producto específico por su ID. Ejecuta una consulta SQL que une las tablas de productos y categorías donde el ID del producto coincide con el ID proporcionado.
+  - `getProducto(ResultSet rs)`: Este método es un helper que crea un objeto `Producto` a partir de un `ResultSet`.
+
+<h1 align="center">ProductosServiceJdbcImpl</h1>
+
+```java
+package org.CCristian.apiservlet.webapp.headers.services;
+
+import org.CCristian.apiservlet.webapp.headers.models.Producto;
+import org.CCristian.apiservlet.webapp.headers.repositories.ProductoRepositoryJdbcImpl;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Optional;
+
+public class ProductosServiceJdbcImpl implements ProductoService{
+
+    private ProductoRepositoryJdbcImpl repositoryJdbc;
+
+    public ProductosServiceJdbcImpl(Connection connection) {
+        this.repositoryJdbc = new ProductoRepositoryJdbcImpl(connection);
+    }
+
+    @Override
+    public List<Producto> listar(){
+        try {
+            return repositoryJdbc.listar();
+        } catch (SQLException throwables) {
+            throw new ServiceJdbcException(throwables.getMessage(), throwables.getCause());
+        }
+    }
+
+    @Override
+    public Optional<Producto> porId(Long id) {
+        try {
+            return Optional.ofNullable(repositoryJdbc.porId(id));
+        } catch (SQLException throwables) {
+            throw new ServiceJdbcException(throwables.getMessage(), throwables.getCause());
+        }
+    }
+}
+```
+
+Esta clase implementa la interfaz `ProductoService` y proporciona lógica de negocio para gestionar productos.
+
+- Atributo:
+  - `repositoryJdbc`: Una instancia de `ProductoRepositoryJdbcImpl` para interactuar con la base de datos.
+- Métodos:
+  - `listar()`: Este método llama al método `listar` del repositorio y devuelve una lista de productos. Si ocurre una excepción, se lanza una `ServiceJdbcException`.
+  - `porId(Long id)`: Este método llama al método `porId` del repositorio y devuelve un producto por su ID. Si ocurre una excepción, se lanza una `ServiceJdbcException`.
+
+ <h1 align="center"></h1>
+
+```java
+ package org.CCristian.apiservlet.webapp.headers.controllers;
+
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.CCristian.apiservlet.webapp.headers.models.Producto;
+import org.CCristian.apiservlet.webapp.headers.services.LoginService;
+import org.CCristian.apiservlet.webapp.headers.services.LoginServiceSessionImpl;
+import org.CCristian.apiservlet.webapp.headers.services.ProductoService;
+import org.CCristian.apiservlet.webapp.headers.services.*;
+
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Optional;
+
+@WebServlet({"/productos.html", "/productos"})
+public class ProductoServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+
+        Connection conn = (Connection) req.getAttribute("conn"); /*Obtiene la conexión a la Base de Datos*/
+        ProductoService service = new ProductosServiceJdbcImpl(conn);
+
+        List<Producto> productos = null;   /*Obtiene una lista con los Productos*/
+        try {
+            productos = service.listar();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        LoginService auth = new LoginServiceSessionImpl();
+        Optional<String> usernameOptional = auth.getUsername(req);  /*Obtiene en nombre de Usuario*/
+
+        /*Pasando parámetros*/
+        req.setAttribute("productos",productos);
+        req.setAttribute("username",usernameOptional);
+        getServletContext().getRequestDispatcher("/listar.jsp").forward(req, resp);
+    }
+}
+```
+
+Este servlet maneja las solicitudes HTTP para listar productos.
+
+- Método:
+  - `doGet(HttpServletRequest req, HttpServletResponse resp)`: Este método maneja las solicitudes GET. Obtiene una conexión a la base de datos de la solicitud, crea una instancia de `ProductosServiceJdbcImpl` y obtiene una lista de productos. También obtiene el nombre de usuario del `LoginService`, añade los productos y el nombre de usuario como atributos de la solicitud, y reenvía la solicitud al JSP `listar.jsp`.
+ 
