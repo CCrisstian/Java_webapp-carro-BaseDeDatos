@@ -262,3 +262,63 @@ Este servlet maneja las solicitudes HTTP para listar productos.
 - Método:
   - `doGet(HttpServletRequest req, HttpServletResponse resp)`: Este método maneja las solicitudes GET. Obtiene una conexión a la base de datos de la solicitud, crea una instancia de `ProductosServiceJdbcImpl` y obtiene una lista de productos. También obtiene el nombre de usuario del `LoginService`, añade los productos y el nombre de usuario como atributos de la solicitud, y reenvía la solicitud al JSP `listar.jsp`.
  
+<h1 align="center">listar.jsp</h1>
+
+```jsp
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="java.util.*, org.CCristian.apiservlet.webapp.headers.models.*" %>
+
+<%
+    List<Producto> productos = (List<Producto>) request.getAttribute("productos");
+    Optional<String> username = (Optional<String>) request.getAttribute("username");
+
+    String mensajeRequest = (String) request.getAttribute("mensaje");
+    String mensajeApp = (String) application.getAttribute("mensaje");
+%>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Listado de Productos</title>
+</head>
+<body>
+    <h1>Listado de Productos</h1>
+    <% if (username.isPresent()) { %>
+        <div>Hola <%= username.get() %>, bienvenido!</div>
+    <% } %>
+    <table>
+        <tr>
+            <th>Id</th>
+            <th>Nombre</th>
+            <th>Tipo</th>
+            <% if (username.isPresent()) { %>
+                <th>Precio</th>
+                <th>Agregar</th>
+            <% } %>
+        </tr>
+        <% for (Producto p : productos) { %>
+            <tr>
+                <td><%= p.getId() %></td>
+                <td><%= p.getNombre() %></td>
+                <td><%= p.getTipo() %></td>
+                <% if (username.isPresent()) { %>
+                    <td><%= p.getPrecio() %></td>
+                    <td><a href="<%= request.getContextPath() %>/carro/agregar?id=<%= p.getId() %>">Agregar al Carro</a></td>
+                <% } %>
+            </tr>
+        <% } %>
+    </table>
+    <p><%= mensajeApp %></p>
+    <p><%= mensajeRequest %></p>
+</body>
+</html>
+```
+
+Este es un archivo JSP que muestra una lista de productos.
+
+- Uso de atributos:
+  - `productos`: La lista de productos obtenida de la solicitud.
+  - `username`: El nombre de usuario obtenido de la solicitud.
+  - `mensajeRequest` y `mensajeApp`: Mensajes que pueden ser mostrados en la página, obtenidos de la solicitud y el contexto de la aplicación, respectivamente.
+- Contenido:
+  - Un saludo al usuario si está presente.
+  - Una tabla que lista los productos, mostrando el ID, nombre, tipo y, si el usuario está presente, el precio y un enlace para agregar el producto al carrito.
